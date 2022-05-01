@@ -180,22 +180,30 @@ Apify.main(async () => {
             useIncognitoPages: true,
         },
         preNavigationHooks: [async ({ request, page }, gotoOptions) => {
+            const { userData: { label } } = request;
+
             if (isFinishing) {
                 // avoid browser-pool errors with Target closed.
                 request.noRetry = true;
                 throw new Error('Ending scrape');
             }
 
+            let blockUrlPatterns = URL_PATTERNS_TO_BLOCK;
+
+            if (label === LABELS.DETAIL) {
+                blockUrlPatterns = URL_PATTERNS_TO_BLOCK.concat([
+                    'maps.googleapis.com',
+                ]);
+            } else if (label === LABELS.ZPIDS || label === LABELS.ENRICHED_ZPIDS) {
+                blockUrlPatterns = URL_PATTERNS_TO_BLOCK.concat([
+                    'maps.googleapis.com',
+                    '.js',
+                ]);
+            }
+
             /** @type {any} */
             await puppeteer.blockRequests(page, {
-                urlPatterns: URL_PATTERNS_TO_BLOCK.concat([
-                    LABELS.DETAIL,
-                    LABELS.ZPIDS,
-                    LABELS.ENRICHED_ZPIDS,
-                ].includes(request.userData.label) ? [
-                        'maps.googleapis.com',
-                        '.js',
-                    ] : []),
+                urlPatterns: blockUrlPatterns,
             });
 
             await extendScraperFunction(undefined, {
